@@ -1,0 +1,4 @@
+.env
+prices.db
+venv/
+__pycache__/
