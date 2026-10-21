@@ -1,0 +1,43 @@
+name: Price check (v2 - GoLogin Web Unlocker)
+
+# Runs every 6 hours (4 runs/day) plus a manual button.
+# 2 products x 4 runs x 30 days = ~240 Web Unlocker pages/month, well inside
+# the 1,000-request free trial. Add more products carefully.
+on:
+  schedule:
+    - cron: "0 */6 * * *" # 00:00, 06:00, 12:00, 18:00 UTC
+  workflow_dispatch: # manual run from the Actions tab
+
+concurrency:
+  group: price-check-v2
+  cancel-in-progress: false # never run two checks at once against the same db
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # v2 keeps its own price history (prices_v2.db) and its own monthly
+      # Web Unlocker counter, separate from v1. Cache key prefix: prices-v2-
+      - name: Restore v2 price history
+        uses: actions/cache@v4
+        with:
+          path: prices_v2.db
+          key: prices-v2-${{ github.run_id }}
+          restore-keys: prices-v2-
+
+      - name: Run price tracker v2
+        env:
+          GOLOGIN_WEBUNLOCKER_API_KEY: ${{ secrets.GOLOGIN_WEBUNLOCKER_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python price_tracker_v2.py
