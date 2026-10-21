@@ -1,0 +1,41 @@
+name: Price check (v1 - plain requests)
+
+# MANUAL ONLY. There is no schedule on purpose.
+# v1 fetches Amazon with plain requests.get() from a GitHub-hosted runner
+# (a datacenter IP). It usually gets blocked. That is the expected result,
+# not a bug - the script logs "BLOCKED: ..." and exits normally.
+on:
+  workflow_dispatch: # run it yourself from the Actions tab
+
+concurrency:
+  group: price-check-v1
+  cancel-in-progress: false # never run two checks at once against the same db
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # v1 keeps its own price history, separate from v2, so the two versions
+      # never mix prices. Cache key prefix: prices-v1-
+      - name: Restore v1 price history
+        uses: actions/cache@v4
+        with:
+          path: prices.db
+          key: prices-v1-${{ github.run_id }}
+          restore-keys: prices-v1-
+
+      - name: Run price tracker v1
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python price_tracker_v1.py
